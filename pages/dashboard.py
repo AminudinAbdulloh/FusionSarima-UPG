@@ -156,13 +156,21 @@ def render() -> None:
     section_header(
         "Agregasi",
         "Ringkasan Tahunan",
-        "Total, rata-rata, minimum, dan maksimum per tahun",
+        "Total, rata-rata, minimum, maksimum, dan pertumbuhan per tahun",
     )
     yearly = (
         df_raw.groupby("Tahun")["Total_Penumpang"]
         .agg(Total="sum", **{"Rata-rata / Bulan": "mean"}, Minimum="min", Maksimum="max")
         .reset_index()
     )
+    # Hitung pertumbuhan YoY (%) berdasarkan Total sebelum diformat
+    pct_changes = yearly["Total"].pct_change() * 100
+    def fmt_growth(val):
+        if pd.isna(val):
+            return "—"
+        sign = "+" if val > 0 else ""
+        return f"{sign}{val:.2f}%"
+    yearly["Pertumbuhan"] = pct_changes.apply(fmt_growth)
     for col in ["Total", "Rata-rata / Bulan", "Minimum", "Maksimum"]:
         yearly[col] = yearly[col].apply(fmt_num)
     yearly["Tahun"] = yearly["Tahun"].astype(int).astype(str)
