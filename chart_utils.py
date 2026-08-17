@@ -62,27 +62,74 @@ def chart_datang_berangkat(df: pd.DataFrame) -> go.Figure:
     fig.update_yaxes(tickformat=",.0f")
     return fig
 
-def chart_seasonal_pattern(ts: pd.Series) -> go.Figure:
-    """Bar chart of average monthly passengers to reveal seasonality."""
-    monthly_avg = ts.groupby(ts.index.month).mean()
-    overall_avg = monthly_avg.mean()
-    bulan_names = [list(BULAN_FULL.values())[m - 1][:3] for m in monthly_avg.index]
+def chart_seasonal_pattern(ts: pd.Series, selected_year: int | None = None) -> go.Figure:
+    """Clean bar chart of monthly passenger patterns.
+
+    Args:
+        ts: Full time series.
+        selected_year: If None, shows the grand average across ALL years.
+                       If an integer, shows actual monthly values for that year.
+    """
+    bulan_names = [list(BULAN_FULL.values())[m - 1][:3] for m in range(1, 13)]
+    years       = sorted(ts.index.year.unique())
+    year_min    = years[0]
+    year_max    = years[-1]
+
+    if selected_year is None:
+        # ── Grand average across all years ─────────────────────────────────────
+        monthly_avg = ts.groupby(ts.index.month).mean()
+        y_vals      = [monthly_avg.get(m, 0) for m in range(1, 13)]
+        bar_color   = C["blue"]
+        bar_opacity = 0.82
+        label       = f"Rata-rata {year_min}–{year_max}"
+        hover_tmpl  = (
+            "<b>%{x}</b><br>"
+            f"Rata-rata {year_min}–{year_max}: "
+            "<b>%{y:,.0f}</b> penumpang<extra></extra>"
+        )
+        ref_val     = float(pd.Series(y_vals).mean())
+        ref_label   = f"Rata-rata keseluruhan: {ref_val / 1000:.0f}K"
+    else:
+        # ── Actual data for selected year ──────────────────────────────────────
+        yr_ts       = ts[ts.index.year == selected_year]
+        yr_by_mo    = yr_ts.groupby(yr_ts.index.month).first()
+        y_vals      = [float(yr_by_mo[m]) if m in yr_by_mo.index else 0 for m in range(1, 13)]
+        # colour shifts for each year so bars look distinct from "all-years" mode
+        YEAR_COLORS = [C["blue"], C["amber"], C["green"], C["purple"],
+                       C["red"], C["cyan"], "#EA580C", "#65A30D"]
+        bar_color   = YEAR_COLORS[(selected_year - year_min) % len(YEAR_COLORS)]
+        bar_opacity = 0.82
+        label       = f"Data Tahun {selected_year}"
+        hover_tmpl  = (
+            f"<b>%{{x}} {selected_year}</b><br>"
+            "Penumpang: <b>%{y:,.0f}</b><extra></extra>"
+        )
+        # reference = grand average for comparison
+        monthly_avg = ts.groupby(ts.index.month).mean()
+        ref_val     = float(monthly_avg.mean())
+        ref_label   = f"Rata-rata {year_min}–{year_max}: {ref_val / 1000:.0f}K"
+
+    texts = [f"{v / 1000:.1f}K" if v else "" for v in y_vals]
 
     fig = go.Figure(go.Bar(
         x=bulan_names,
-        y=monthly_avg.values,
-        marker=dict(color=C["blue"], opacity=0.82, line=dict(width=0)),
-        text=[f"{v / 1000:.0f}K" for v in monthly_avg.values],
+        y=y_vals,
+        marker=dict(color=bar_color, opacity=bar_opacity, line=dict(width=0)),
+        text=texts,
         textposition="outside",
         textfont=dict(size=9, color="#6B7280"),
-        name="Rata-rata",
+        name=label,
+        hovertemplate=hover_tmpl,
     ))
+
     fig.add_hline(
-        y=overall_avg,
+        y=ref_val,
         line=dict(color="#CBD5E1", dash="dash", width=1.5),
-        annotation_text=f"Rata-rata: {overall_avg / 1000:.0f}K",
+        annotation_text=ref_label,
         annotation_font=dict(color="#6B7280", size=10),
+        annotation_position="top left",
     )
+
     apply_plotly_theme(fig, height=360)
     fig.update_yaxes(tickformat=",.0f")
     return fig

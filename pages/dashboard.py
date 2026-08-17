@@ -60,12 +60,29 @@ def render() -> None:
         st.plotly_chart(chart_ts_overview(ts), use_container_width=True)
 
     with col_sea:
+        year_min = int(ts.index.year.min())
+        year_max = int(ts.index.year.max())
         section_header(
             "Musiman",
             "Pola Bulanan",
-            "Rata-rata per bulan (ribu penumpang)",
+            f"Rata-rata & detail per tahun ({year_min}–{year_max})",
         )
-        st.plotly_chart(chart_seasonal_pattern(ts), use_container_width=True)
+
+        year_options = [f"Semua Tahun ({year_min}–{year_max})"] + [
+            str(y) for y in range(year_min, year_max + 1)
+        ]
+        sel = st.selectbox(
+            "Tampilkan data:",
+            year_options,
+            index=0,
+            key="seasonal_year_filter",
+            label_visibility="collapsed",
+        )
+        selected_year = None if sel.startswith("Semua") else int(sel)
+        st.plotly_chart(
+            chart_seasonal_pattern(ts, selected_year=selected_year),
+            use_container_width=True,
+        )
 
     # ── Highlight Trend & Seasonality (Requested Analysis) ────────────────────
     info_box(
